@@ -40,15 +40,21 @@ public:
     // TO_DO: Consider using a delimiter in the serialize function to separate these items for easier parsing.
     string serialize() const {
         ostringstream oss;
+        char dollar = '$';
         oss.write(reinterpret_cast<const char*>(&id), sizeof(id)); // Writes the binary representation of the ID.
-        oss.write(reinterpret_cast<const char*>(&id), sizeof(id))// (new!) Writes the binary representation of a $
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(reinterpret_cast<const char*>(&manager_id), sizeof(manager_id)); // Writes the binary representation of the Manager id
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         int name_len = name.size();
         int bio_len = bio.size();
         oss.write(reinterpret_cast<const char*>(&name_len), sizeof(name_len)); // // Writes the size of the Name in binary format.
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(name.c_str(), name.size()); // writes the name in binary form
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(reinterpret_cast<const char*>(&bio_len), sizeof(bio_len)); // // Writes the size of the Bio in binary format. 
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(bio.c_str(), bio.size()); // writes bio in binary form
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
     }
 };
 
@@ -70,7 +76,10 @@ public:
             cur_size += r.get_size(); // Updating page size
 
             // TO_DO: update slot directory information
-
+            slot_directory.first = cur_size;
+            slot_directory.second = record_size;
+            cur_size = cur_size+record_size+6;
+            
             return true;
         }
         
@@ -91,11 +100,19 @@ public:
 
             offset += serialized.size();
         }
+        //cur_size =0
 
         // TO_DO: Put a delimiter here to indicate slot directory starts from here 
+        ostringstream oss;
+        oss.write(&("#"), sizeof("#"));// (new!) Writes the binary representation of a $
+        cur_size = offset;
+        int dummy = cur_size;
 
-        for (const auto& slots : slot_directory) { // TO_DO: Write the slot-directory information into page_data. You'll use slot-directory to retrieve record(s).
-
+        for (const auto& slots : slot_directory) { 
+            // TO_DO: Write the slot-directory information into page_data. You'll use slot-directory to retrieve record(s).
+            dummy = cur_size - record.get_size();
+            slots.first = dummy;
+            slots.second = record.get_size();
 
         }
         
@@ -113,8 +130,42 @@ public:
         if (bytes_read == 4096) {
             
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
-            // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
+            //keep the offtser(start), end of offter(end), lenght
+            int start = 0;
+            //int end_record = -1;
+            int record_length = 0;
+            //for each charatcer in the page_data
+            for(const auto& letter : page_data){
+                //find the record delimeter. - #
+                if(letter == '#'){
+                    //end_record = c;
+                    
+                    //read the record from the start until #
+                    stringstream ss(page_data.substr(start, record_length));
+                    string token;
+                    vector<string> tokens;
+                    while (getline(ss, token, "#")) {
+                        tokens.push_back(token);
+                    }
 
+                    //DEBUGGIN
+                    for (const string& t : tokens) {
+                        cout << "Token: " << t << endl;
+                    }
+
+                    records.push();
+                    slot_directory.back().first = start + record_length;
+                    slot_directory.back().second = record_length;
+
+                    start = record_length + 1;
+                    record_length = 0;
+                }
+                record_length++;
+            }
+            
+            // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
+            
+            
             return true;
         }
 
@@ -195,9 +246,11 @@ public:
         
         data_file.seekg(0, ios::beg);  // Rewind the data_file to the beginning for reading
 
-        // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory.        
+        // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory. 4KB        
         int page_number = 0;
         while(buffer[page_number].read_from_data_file(data_file)){
+
+
         
         }
         // TO_DO: Print "Record not found" if no records match.
