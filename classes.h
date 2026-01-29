@@ -75,11 +75,11 @@ public:
             return false; // Cannot insert the record into this page
         } else {
             records.push_back(r); // Record stored in current page
-            cur_size += r.get_size(); // Updating page size
-
             // TO_DO: update slot directory information
             slot_directory.push_back(make_pair(cur_size, record_size));
-            cout << "INERTING:" << "(" << cur_size << "," << record_size << ")" << endl;
+            //DEBUGGIN
+            //cout << "INERTING:" << "(" << cur_size << "," << record_size << ")" << endl;
+            cur_size += r.get_size(); // Updating page size
             return true;
         }
         
@@ -105,7 +105,7 @@ public:
         memcpy(page_data + offset, &(hash_delimiter), sizeof(char));
         offset += sizeof(hash_delimiter);
 
-        for (const auto& slots : slot_directory) { 
+        for(const auto& slots : slot_directory) { 
             // TO_DO: Write the slot-directory information into page_data. You'll use slot-directory to retrieve record(s).
             // offset - int of 4 bytes
 
@@ -118,11 +118,14 @@ public:
             // length - int of 4 bytes
             memcpy(page_data + offset, &second, sizeof(int64_t));
             offset += sizeof(int64_t);
+            
+            //DEBUGGING
             /*
             cout << "********************************" << endl;
             cout << "copint to memory:" << first << "&&"<< second << "---" << endl;
             cout << "********************************" << endl;
             */
+            
         }
         
         out.write(page_data, sizeof(page_data)); // Write the page_data to the EmployeeRelation.dat file 
@@ -149,12 +152,12 @@ public:
                 }
             }
 
-            /* DEBUGGIN
-            char my_char;
-            memcpy(&my_char,  page_data + delimeter_position, 1);
-            cout << my_char << endl;
-            cout << "START HERE\n";
-            */
+            //DEBUGGIN
+            //char my_char;
+            //memcpy(&my_char,  page_data + delimeter_position, 1);
+            //cout << my_char << endl;
+            //out << "START HERE\n";
+            
 
             //starting position of <offset, lenght of record>
             delimeter_position += 1;
@@ -171,6 +174,7 @@ public:
                 //cout << "@@@" <<first << "--" << second<< "@@@" << endl;
 
                 //populate the slot_directory and the records
+                slot_directory.push_back(make_pair(first, second));
 
                 //try to read the next ones
                 delimeter_position += sizeof(int64_t) * 2;
@@ -178,7 +182,16 @@ public:
             }
             //cout << "END HERE" << endl;
             // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
-            
+            //read the first record
+            int start = 0;
+            int end = -1;
+            end = slot_directory[0].second;
+            for(const auto& slots : slot_directory){
+                //read record into char*
+                char* my_string;
+                strncpy(my_string, page_data + start, end);
+                
+            }
             return true;
         }
 
