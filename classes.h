@@ -37,10 +37,11 @@ public:
     }
     
     // Take a look at Figure 9.9 and read the Section 9.7.2 [Record Organization for Variable Length Records]
-    // TODO: Consider using a delimiter in the serialize function to separate these items for easier parsing.
+    // TO_DO: Consider using a delimiter in the serialize function to separate these items for easier parsing.
     string serialize() const {
         ostringstream oss;
         oss.write(reinterpret_cast<const char*>(&id), sizeof(id)); // Writes the binary representation of the ID.
+        oss.write(reinterpret_cast<const char*>(&id), sizeof(id))// (new!) Writes the binary representation of a $
         oss.write(reinterpret_cast<const char*>(&manager_id), sizeof(manager_id)); // Writes the binary representation of the Manager id
         int name_len = name.size();
         int bio_len = bio.size();
