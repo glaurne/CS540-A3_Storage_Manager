@@ -39,8 +39,9 @@ public:
     // Take a look at Figure 9.9 and read the Section 9.7.2 [Record Organization for Variable Length Records]
     // TO_DO: Consider using a delimiter in the serialize function to separate these items for easier parsing.
     string serialize() const {
-        ostringstream oss;
         char dollar = '$';
+
+        /*ostringstream oss;
         oss.write(reinterpret_cast<const char*>(&id), sizeof(id)); // Writes the binary representation of the ID.
         oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(reinterpret_cast<const char*>(&manager_id), sizeof(manager_id)); // Writes the binary representation of the Manager id
@@ -54,7 +55,8 @@ public:
         oss.write(reinterpret_cast<const char*>(&bio_len), sizeof(bio_len)); // // Writes the size of the Bio in binary format. 
         oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
         oss.write(bio.c_str(), bio.size()); // writes bio in binary form
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
+        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $*/
+        return to_string(id)+ dollar + name + dollar + bio + dollar + to_string(manager_id) + dollar;
     }
 };
 
@@ -76,14 +78,11 @@ public:
             cur_size += r.get_size(); // Updating page size
 
             // TO_DO: update slot directory information
-            slot_directory.first = cur_size;
-            slot_directory.second = record_size;
-            cur_size = cur_size+record_size+6;
-            
+            slot_directory.push_back(make_pair(cur_size, record_size));
+            cout << "INERTING:" << "(" << cur_size << "," << record_size << ")" << endl;
             return true;
         }
         
-
     }
 
     // Function to write the page to a binary file, i.e., EmployeeRelation.dat file
@@ -100,20 +99,30 @@ public:
 
             offset += serialized.size();
         }
-        //cur_size =0
 
         // TO_DO: Put a delimiter here to indicate slot directory starts from here 
-        ostringstream oss;
-        oss.write(&("#"), sizeof("#"));// (new!) Writes the binary representation of a $
-        cur_size = offset;
-        int dummy = cur_size;
+        char hash_delimiter = '#';
+        memcpy(page_data + offset, &(hash_delimiter), sizeof(char));
+        offset += sizeof(hash_delimiter);
 
         for (const auto& slots : slot_directory) { 
             // TO_DO: Write the slot-directory information into page_data. You'll use slot-directory to retrieve record(s).
-            dummy = cur_size - record.get_size();
-            slots.first = dummy;
-            slots.second = record.get_size();
+            // offset - int of 4 bytes
 
+            int64_t first = static_cast<int64_t>(slots.first);
+            int64_t second = static_cast<int64_t>(slots.second);
+
+            memcpy(page_data + offset, &first, sizeof(int64_t));
+            offset += sizeof(int64_t);
+        
+            // length - int of 4 bytes
+            memcpy(page_data + offset, &second, sizeof(int64_t));
+            offset += sizeof(int64_t);
+            /*
+            cout << "********************************" << endl;
+            cout << "copint to memory:" << first << "&&"<< second << "---" << endl;
+            cout << "********************************" << endl;
+            */
         }
         
         out.write(page_data, sizeof(page_data)); // Write the page_data to the EmployeeRelation.dat file 
@@ -125,46 +134,50 @@ public:
         char page_data[4096] = {0}; // Character array used to read 4 KB from the data file to your main memory. 
         in.read(page_data, 4096); // Read a page of 4 KB from the data file 
 
-
         streamsize bytes_read = in.gcount(); // used to check if 4KB was actually read from the data file
         if (bytes_read == 4096) {
             
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
-            //keep the offtser(start), end of offter(end), lenght
-            int start = 0;
-            //int end_record = -1;
-            int record_length = 0;
-            //for each charatcer in the page_data
-            for(const auto& letter : page_data){
+            // read page_data backward from footer until we find '#'
+            size_t delimeter_position = 4097;
+            for (size_t i = bytes_read - 1; i >= 0; i-- > 0) {
+                //cout << page_data[i] << ",";
                 //find the record delimeter. - #
-                if(letter == '#'){
-                    //end_record = c;
-                    
-                    //read the record from the start until #
-                    stringstream ss(page_data.substr(start, record_length));
-                    string token;
-                    vector<string> tokens;
-                    while (getline(ss, token, "#")) {
-                        tokens.push_back(token);
-                    }
-
-                    //DEBUGGIN
-                    for (const string& t : tokens) {
-                        cout << "Token: " << t << endl;
-                    }
-
-                    records.push();
-                    slot_directory.back().first = start + record_length;
-                    slot_directory.back().second = record_length;
-
-                    start = record_length + 1;
-                    record_length = 0;
+                if(page_data[i] == '#'){
+                    delimeter_position = i;
+                    break;
                 }
-                record_length++;
             }
-            
+
+            /* DEBUGGIN
+            char my_char;
+            memcpy(&my_char,  page_data + delimeter_position, 1);
+            cout << my_char << endl;
+            cout << "START HERE\n";
+            */
+
+            //starting position of <offset, lenght of record>
+            delimeter_position += 1;
+            //while there's still data to read
+            int64_t first;
+            int64_t second;
+            int limit = 0;
+            while(delimeter_position + sizeof(int64_t) * 2 <= bytes_read && limit <10){
+                //read the next 2 integers
+                memcpy(&first,  page_data + delimeter_position, 8);
+                memcpy(&second, page_data + delimeter_position + 8, 8);
+
+                //DEBUGGIN
+                //cout << "@@@" <<first << "--" << second<< "@@@" << endl;
+
+                //populate the slot_directory and the records
+
+                //try to read the next ones
+                delimeter_position += sizeof(int64_t) * 2;
+                limit++;   
+            }
+            //cout << "END HERE" << endl;
             // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
-            
             
             return true;
         }
@@ -248,12 +261,17 @@ public:
 
         // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory. 4KB        
         int page_number = 0;
-        while(buffer[page_number].read_from_data_file(data_file)){
-
-
-        
+        buffer[page_number].read_from_data_file(data_file);
+        for(int i=0; buffer[page_number].read_from_data_file(data_file) && i<3; i++){
+            if(false){
+                cout << "Record found for the ID:" <<  searchId << endl;
+                cout << "print here all the info for the ID";
+            }
         }
+        
         // TO_DO: Print "Record not found" if no records match.
+        cout << "Record not found for the ID:" <<  searchId << endl;
+        return;
 
     }
 };
