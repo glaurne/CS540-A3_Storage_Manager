@@ -24,6 +24,8 @@ int main(int argc, char* const argv[]) {
     // Assuming the Employee.CSV file is in the same directory, 
     // we want to read from the Employee.csv and write into the new data_file
     manager.createFromFile("Employee.csv");
+    
+
 
     // TODO: You'll receive employee IDs as arguments, process them to retrieve the record, or display a message if not found.
     stringstream ss;
@@ -31,7 +33,13 @@ int main(int argc, char* const argv[]) {
     for(int i=1; i < argc; i++){
         ss << argv[i];
         ss >> id_to_process;
-       manager.findAndPrintEmployee(id_to_process);
+        cout << "PROCESSING ID:"<<id_to_process << endl;;
+        
+        manager.findAndPrintEmployee(id_to_process);
+            cout << "MADE IT outtttt here" << endl;
+            cout << "MADE IT outtttt here" << endl;
+            cout << "MADE IT outtttt here" << endl;
+            cout << "MADE IT outtttt here" << endl;
     }
     
     

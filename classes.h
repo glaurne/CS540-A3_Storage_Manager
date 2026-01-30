@@ -40,23 +40,12 @@ public:
     // TO_DO: Consider using a delimiter in the serialize function to separate these items for easier parsing.
     string serialize() const {
         char dollar = '$';
-
-        /*ostringstream oss;
-        oss.write(reinterpret_cast<const char*>(&id), sizeof(id)); // Writes the binary representation of the ID.
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
-        oss.write(reinterpret_cast<const char*>(&manager_id), sizeof(manager_id)); // Writes the binary representation of the Manager id
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
-        int name_len = name.size();
-        int bio_len = bio.size();
-        oss.write(reinterpret_cast<const char*>(&name_len), sizeof(name_len)); // // Writes the size of the Name in binary format.
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
-        oss.write(name.c_str(), name.size()); // writes the name in binary form
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
-        oss.write(reinterpret_cast<const char*>(&bio_len), sizeof(bio_len)); // // Writes the size of the Bio in binary format. 
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $
-        oss.write(bio.c_str(), bio.size()); // writes bio in binary form
-        oss.write(&dollar, sizeof(dollar));// (new!) Writes the binary representation of a $*/
-        return to_string(id)+ dollar + name + dollar + bio + dollar + to_string(manager_id) + dollar;
+        string my_string = to_string(id)+ dollar + name + dollar + bio + dollar + to_string(manager_id);
+        //my_string.erase(my_string.size());
+        //cout << "++" << to_string(id) << "**" << to_string(id).size() <<endl;
+        
+        //cout << "--"<<my_string[my_string.size()-1] << "#" << my_string[my_string.size()] << "**"<<endl;
+        return my_string;
     }
 };
 
@@ -70,19 +59,24 @@ public:
     // Function to insert a record into the page
     bool insert_record_into_page(Record r) {
         int record_size = r.get_size();
-        int slot_size = sizeof(int) * 2;
-        if (cur_size + record_size + slot_size > 4096) { //Check if page size limit exceeded, considering slot directory size
+        int slot_size = sizeof(int64_t) * 2;
+
+        if (cur_size + record_size + slot_size + 3*sizeof('$') > 4096) { //Check if page size limit exceeded, considering slot directory size
             return false; // Cannot insert the record into this page
-        } else {
+        }else {
             records.push_back(r); // Record stored in current page
+            
             // TO_DO: update slot directory information
-            slot_directory.push_back(make_pair(cur_size, record_size));
-            //DEBUGGIN
-            //cout << "INERTING:" << "(" << cur_size << "," << record_size << ")" << endl;
+            if(cur_size == 0){
+                slot_directory.push_back(make_pair(0, record_size + 3));
+            }else{
+                slot_directory.push_back(make_pair(cur_size - (sizeof(int64_t) * 2), record_size + 3));
+            }
             cur_size += r.get_size(); // Updating page size
-            return true;
+            cur_size += 3*sizeof('$');
+            cur_size += sizeof(int64_t) * 2;
         }
-        
+        return true;
     }
 
     // Function to write the page to a binary file, i.e., EmployeeRelation.dat file
@@ -94,12 +88,10 @@ public:
 
         for (const auto& record : records) { // Writing the records into the page_data
             string serialized = record.serialize();
-
             memcpy(page_data + offset, serialized.c_str(), serialized.size());
-
             offset += serialized.size();
         }
-
+        
         // TO_DO: Put a delimiter here to indicate slot directory starts from here 
         char hash_delimiter = '#';
         memcpy(page_data + offset, &(hash_delimiter), sizeof(char));
@@ -119,17 +111,9 @@ public:
             memcpy(page_data + offset, &second, sizeof(int64_t));
             offset += sizeof(int64_t);
             
-            //DEBUGGING
-            /*
-            cout << "********************************" << endl;
-            cout << "copint to memory:" << first << "&&"<< second << "---" << endl;
-            cout << "********************************" << endl;
-            */
             
         }
-        
         out.write(page_data, sizeof(page_data)); // Write the page_data to the EmployeeRelation.dat file 
-
     }
 
     // Read a page from a binary input stream, i.e., EmployeeRelation.dat file to populate a page object
@@ -143,8 +127,8 @@ public:
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
             // read page_data backward from footer until we find '#'
             size_t delimeter_position = 4097;
-            for (size_t i = bytes_read - 1; i >= 0; i-- > 0) {
-                //cout << page_data[i] << ",";
+            for (size_t i = bytes_read - 1; i >= 0; --i) {
+
                 //find the record delimeter. - #
                 if(page_data[i] == '#'){
                     delimeter_position = i;
@@ -152,46 +136,119 @@ public:
                 }
             }
 
-            //DEBUGGIN
-            //char my_char;
-            //memcpy(&my_char,  page_data + delimeter_position, 1);
-            //cout << my_char << endl;
-            //out << "START HERE\n";
-            
-
             //starting position of <offset, lenght of record>
             delimeter_position += 1;
             //while there's still data to read
             int64_t first;
             int64_t second;
-            int limit = 0;
-            while(delimeter_position + sizeof(int64_t) * 2 <= bytes_read && limit <10){
+            //int limit = 0;
+            //cout << "directory info pairs" << endl;
+            while(delimeter_position + (sizeof(int64_t) * 2) <= bytes_read && first == 0){
                 //read the next 2 integers
                 memcpy(&first,  page_data + delimeter_position, 8);
                 memcpy(&second, page_data + delimeter_position + 8, 8);
 
-                //DEBUGGIN
-                //cout << "@@@" <<first << "--" << second<< "@@@" << endl;
-
                 //populate the slot_directory and the records
                 slot_directory.push_back(make_pair(first, second));
+                cout << "reading" << "("<<first<<","<<second<<")"<< endl;
+                cout << "value of delimiter position:"<< delimeter_position<<endl;
 
                 //try to read the next ones
                 delimeter_position += sizeof(int64_t) * 2;
-                limit++;   
+                  
             }
-            //cout << "END HERE" << endl;
+            cout << "SHOULD print pairs " << slot_directory.size()<< endl;
+                int c =1;
+                for(auto const& slot: slot_directory){
+                    cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
+                    c++;
+                }
             // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
-            //read the first record
-            int start = 0;
-            int end = -1;
-            end = slot_directory[0].second;
-            for(const auto& slots : slot_directory){
-                //read record into char*
-                char* my_string;
-                strncpy(my_string, page_data + start, end);
+            int cursor = 0;
+            int num_record = slot_directory.size();
+            while(cursor < bytes_read && num_record > 0){
+                //get a pointer to the data based on the offset
+                const char* raw_data = &page_data[cursor];
+
+                // read first 8 byte int - emplotee id
+                string employee_id(raw_data, cursor+8 - cursor);
+                //memcpy(&employee_id, raw_data, 8);
+                raw_data += 8;
+                cursor += 8;
+                cout << "read ID:" << employee_id << endl;
+                
+                char delimiter = *raw_data;
+                cout << "delimiter:"<< delimiter <<endl;
+                if (delimiter != '$') {
+                    
+                    //throw runtime_error("Format error: expected '$' after employee_id");
+                }
+                raw_data++;
+                cursor++;
+
+                // Read name until '$'
+                const char* name_start = raw_data;
+                while (cursor < bytes_read && *raw_data != '$') {
+                    raw_data++;
+                    cursor++;
+                }
+                string name(name_start, raw_data - name_start);
+                //cout << "read name: " << name << endl;
+                delimiter = *raw_data;
+                cout << "delimter after name:"<< delimiter <<endl;
+
+                raw_data++;  // Skip '$'
+                cursor++;
+
+                //read second string until '$' - bio
+                // Read bio until '$'
+                const char* bio_start = raw_data;
+                while (cursor < bytes_read && *raw_data != '$') {
+                    raw_data++;
+                    cursor++;
+                }
+                string bio(bio_start, raw_data - bio_start);
+                //cout << "read bio: " << endl<< bio <<endl;;
+                delimiter = *raw_data;
+                cout << "character after bio:"<< delimiter <<endl;
+
+                raw_data++;  // Skip '$'
+                cursor++;
+
+                //read last int64 - manager id
+                string manager_id(raw_data, cursor+8 - cursor);
+                //memcpy(&manager_id, raw_data, sizeof(manager_id));
+                cursor += 8;
+                raw_data += 8;
+
+                //cout << "read manager ID: " << manager_id << endl;
+                //cout << "***************************" << endl;
+
+                //create a string vector with all the items
+                vector<string> fields;
+                fields.push_back(employee_id);
+                fields.push_back(name);
+                fields.push_back(bio);
+                fields.push_back(manager_id);
+
+                //create a record instant and populate the record vector
+                Record my_record(fields);
+                records.push_back(my_record);
+                num_record--;
+                if(*raw_data == '#'){
+                    cout << "have we found #???:"<<*raw_data << endl;
+                    break;
+                }
+                cout << "SHOULD print RECORDs " << records.size()<< endl;
+                c =1;
+                for(auto const& record: records){
+                    cout << c <<"--record ID"<<record.id << endl;
+                    c++;
+                }
                 
             }
+            cout << "MADE IT OUT OF THE INFO POPULATOR" << endl;
+
             return true;
         }
 
@@ -235,6 +292,7 @@ public:
         string line, name, bio;
         int id, manager_id;
         int page_number = 0; // Current page we are working on [at most 3 pages]
+        
 
         while (getline(csvFile, line)) {   // Read each line from the CSV file, parse it, and create Employee objects
             stringstream ss(line);
@@ -244,8 +302,7 @@ public:
             while (getline(ss, item, ',')) {
                 fields.push_back(item);
             }
-            Record r = Record(fields);  //create a record object            
-
+            Record r = Record(fields);  //create a record object   
             
             if (!buffer[page_number].insert_record_into_page(r)) { // inserting that record object to the current page
                 
@@ -255,6 +312,7 @@ public:
                 if (page_number >= buffer.size()) {    // Checking if page limit has been reached.
                     
                     for (page& p : buffer) { // using write_into_data_file() to write the pages into the data file
+                        
                         p.write_into_data_file(data_file);
                     }
                     page_number = 0; // Starting again from page 0
@@ -271,20 +329,42 @@ public:
     void findAndPrintEmployee(int searchId) {
         
         data_file.seekg(0, ios::beg);  // Rewind the data_file to the beginning for reading
+        char page_data[4096] = {0};
 
         // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory. 4KB        
+        
         int page_number = 0;
-        buffer[page_number].read_from_data_file(data_file);
-        for(int i=0; buffer[page_number].read_from_data_file(data_file) && i<3; i++){
-            if(false){
-                cout << "Record found for the ID:" <<  searchId << endl;
-                cout << "print here all the info for the ID";
-            }
+        while(buffer[page_number].read_from_data_file(data_file) && page_number < 4){
+            cout << "------------------------" << endl;
+            cout << "---FINISHED READING PAGE #" << page_number + 1<< page_number+ 1<< page_number+ 1 << endl;
+            cout << "------------------------" << endl;
+            //get the first pair <offset, lenght>
+            int num_record = 0;
+            cout << "==== number of record: " <<buffer[page_number].records.size() << endl;
+            cout << "==== number of slots: " <<buffer[page_number].slot_directory.size() << endl;
+            for(auto const &slot : buffer[page_number].slot_directory){
+                //cout << "Checking" << "("<<slot.first<<","<<slot.second<<")"<< endl;
+                //check the first 8 bytes of the record
+                //data file si the binary and we already read the whole thing, so now we're using the off set to read the first 8 bytes
+                //and if the id matches ours then we can print the record there
+                int64_t possible_id = page_data[slot.first];
+                if(possible_id == searchId){
+                   cout << "record found for ID:" <<  searchId << endl;
+                buffer[page_number].records[num_record].print(); //print here all the info for the ID
+                }
+                num_record++;
+                //cout << "#### record NUMBER: " << num_record << endl;
+                  
+            }    
+            page_number++; //next page
+            
         }
+
         
         // TO_DO: Print "Record not found" if no records match.
         cout << "Record not found for the ID:" <<  searchId << endl;
         return;
 
+        
     }
 };
