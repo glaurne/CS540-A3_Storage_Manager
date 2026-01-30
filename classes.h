@@ -130,7 +130,7 @@ public:
         slot_directory.clear();
 
         streamsize bytes_read = in.gcount(); // used to check if 4KB was actually read from the data file
-        cout << "found " <<bytes_read << "bytes" << endl;
+        // cout << "found " <<bytes_read << "bytes" << endl;
         if (bytes_read == 4096) {
             
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
@@ -145,8 +145,8 @@ public:
                 }
             }
 
-            cout << "# found at " << delimeter_position << endl;
-            cout << "char:" << page_data[delimeter_position] << endl;
+            // cout << "# found at " << delimeter_position << endl;
+            // cout << "char:" << page_data[delimeter_position] << endl;
 
             //starting position of <offset, lenght of record>
             delimeter_position += 1;
@@ -170,8 +170,8 @@ public:
 
                 //populate the slot_directory and the records
                 slot_directory.push_back(make_pair(first, second));
-                cout << "reading" << "("<<first<<","<<second<<")"<< endl;
-                cout << "value of delimiter position:"<< delimeter_position<<endl;
+                // cout << "reading" << "("<<first<<","<<second<<")"<< endl;
+                // cout << "value of delimiter position:"<< delimeter_position<<endl;
                 if(second == 0){
                     break;
                 }
@@ -181,10 +181,10 @@ public:
                 
             }
 
-            cout << "SHOULD print pairs " << slot_directory.size()<< endl;
+            // cout << "SHOULD print pairs " << slot_directory.size()<< endl;
             int c =1;
             for(auto const& slot: slot_directory){
-                cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
+                // cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
                 c++;
             }
                 
@@ -201,7 +201,7 @@ public:
                 raw_data += 8;
                 cursor += 8;
                 
-                cout << "read ID:" << employee_id << endl;
+                // cout << "read ID:" << employee_id << endl;
                 
                 char delimiter = *raw_data;
                 //cout << "delimiter:"<< delimiter <<endl;
@@ -261,14 +261,14 @@ public:
                 num_record++;
 
                 if(*raw_data == '#'){
-                    cout << "have we found:"<<*raw_data << endl;
+                    // cout << "have we found:"<<*raw_data << endl;
                     break;
                 }
             }
-            cout << "SHOULD print RECORDs " << records.size()<< endl;
+            // cout << "SHOULD print RECORDs " << records.size()<< endl;
                 c =1;
                 for(auto const& record: records){
-                    cout << c <<"--record ID"<<record.id << endl;
+                    // cout << c <<"--record ID"<<record.id << endl;
                     c++;
                 }
 
@@ -321,7 +321,6 @@ public:
         int id, manager_id;
         int page_number = 0; // Current page we are working on [at most 3 pages]
         
-
         while (getline(csvFile, line)) {   // Read each line from the CSV file, parse it, and create Employee objects
             stringstream ss(line);
             string item;
@@ -374,10 +373,9 @@ public:
                 int employee_id = record.id;
 
                 if(employee_id == searchId){
+                    cout << "--------FOUND RECORD-------" << endl;
                     record.print();
                 }
-                
-                
                 num_record++;
             }    
             
@@ -386,8 +384,6 @@ public:
                 break;
             }
         }
-            cout << "MADE IT HERE" << endl;
-            cout << "MADE IT HERE" << endl;
             cout << "MADE IT HERE" << endl;
 
         

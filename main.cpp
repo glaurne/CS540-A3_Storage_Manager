@@ -31,15 +31,17 @@ int main(int argc, char* const argv[]) {
     stringstream ss;
     int id_to_process = -1;
     for(int i=1; i < argc; i++){
-        ss << argv[i];
+
+        // ss << argv[i];
+        // ss >> id_to_process;
+
+        ss.clear();
+        ss.str(argv[i]);
         ss >> id_to_process;
+
         cout << "PROCESSING ID:"<<id_to_process << endl;;
         
         manager.findAndPrintEmployee(id_to_process);
-        cout << "MADE IT OUTOUTOUTOUT here" << endl;
-        cout << "MADE IT OUTOUTOUTOUT here" << endl;
-        cout << "MADE IT OUTOUTOUTOUT here" << endl;
-        cout << "MADE IT OUTOUTOUTOUT here" << endl;
         cout << "MADE IT OUTOUTOUTOUT here" << endl;
 
     }
