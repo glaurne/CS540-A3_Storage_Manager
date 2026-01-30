@@ -41,10 +41,7 @@ public:
     string serialize() const {
         char dollar = '$';
         string my_string = to_string(id)+ dollar + name + dollar + bio + dollar + to_string(manager_id);
-        //my_string.erase(my_string.size());
-        //cout << "++" << to_string(id) << "**" << to_string(id).size() <<endl;
         
-        //cout << "--"<<my_string[my_string.size()-1] << "#" << my_string[my_string.size()] << "**"<<endl;
         return my_string;
     }
 };
@@ -61,7 +58,7 @@ public:
         int record_size = r.get_size();
         int slot_size = sizeof(int64_t) * 2;
 
-        if (cur_size + record_size + slot_size + 3*sizeof('$') > 4096) { //Check if page size limit exceeded, considering slot directory size
+        if (cur_size + record_size + slot_size + 3*sizeof('$') + 1> 4096) { //Check if page size limit exceeded, considering slot directory size
             return false; // Cannot insert the record into this page
         }else {
             records.push_back(r); // Record stored in current page
@@ -70,7 +67,10 @@ public:
             if(cur_size == 0){
                 slot_directory.push_back(make_pair(0, record_size + 3));
             }else{
-                slot_directory.push_back(make_pair(cur_size - (sizeof(int64_t) * 2), record_size + 3));
+                //OG: slot_directory.push_back(make_pair(cur_size - (sizeof(int64_t) * 2), record_size + 3));
+                slot_directory.push_back({cur_size, record_size});
+                cur_size += record_size;
+
             }
             cur_size += r.get_size(); // Updating page size
             cur_size += 3*sizeof('$');
@@ -78,6 +78,9 @@ public:
         }
         return true;
     }
+
+
+
 
     // Function to write the page to a binary file, i.e., EmployeeRelation.dat file
     void write_into_data_file(ostream& out) const { 
@@ -118,55 +121,77 @@ public:
 
     // Read a page from a binary input stream, i.e., EmployeeRelation.dat file to populate a page object
     bool read_from_data_file(istream& in) {
+        
         char page_data[4096] = {0}; // Character array used to read 4 KB from the data file to your main memory. 
         in.read(page_data, 4096); // Read a page of 4 KB from the data file 
 
+        // Clear existing data
+        records.clear();
+        slot_directory.clear();
+
         streamsize bytes_read = in.gcount(); // used to check if 4KB was actually read from the data file
+        cout << "found " <<bytes_read << "bytes" << endl;
         if (bytes_read == 4096) {
             
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
             // read page_data backward from footer until we find '#'
             size_t delimeter_position = 4097;
-            for (size_t i = bytes_read - 1; i >= 0; --i) {
 
+            for (int i = 0 ; i < bytes_read; i++) {
                 //find the record delimeter. - #
-                if(page_data[i] == '#'){
+                if (page_data[i] == '#') {
                     delimeter_position = i;
                     break;
                 }
             }
 
+            cout << "# found at " << delimeter_position << endl;
+            cout << "char:" << page_data[delimeter_position] << endl;
+
             //starting position of <offset, lenght of record>
             delimeter_position += 1;
             //while there's still data to read
+
+            //OG
+            // int64_t first;
+            // int64_t second;
+
+            //DEBUG, hard code fix?
             int64_t first;
             int64_t second;
-            //int limit = 0;
-            //cout << "directory info pairs" << endl;
-            while(delimeter_position + (sizeof(int64_t) * 2) <= bytes_read && first == 0){
+            
+            //cout << delimeter_position + (sizeof(int64_t) * 2) <= bytes_read << endl;
+            //cout << second == 0 << endl;
+            while(delimeter_position + (sizeof(int64_t) * 2) <= bytes_read){
                 //read the next 2 integers
                 memcpy(&first,  page_data + delimeter_position, 8);
                 memcpy(&second, page_data + delimeter_position + 8, 8);
+                
 
                 //populate the slot_directory and the records
                 slot_directory.push_back(make_pair(first, second));
                 cout << "reading" << "("<<first<<","<<second<<")"<< endl;
                 cout << "value of delimiter position:"<< delimeter_position<<endl;
+                if(second == 0){
+                    break;
+                }
 
                 //try to read the next ones
                 delimeter_position += sizeof(int64_t) * 2;
-                  
+                
             }
+
             cout << "SHOULD print pairs " << slot_directory.size()<< endl;
-                int c =1;
-                for(auto const& slot: slot_directory){
-                    cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
-                    c++;
-                }
+            int c =1;
+            for(auto const& slot: slot_directory){
+                cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
+                c++;
+            }
+                
             // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
             int cursor = 0;
-            int num_record = slot_directory.size();
-            while(cursor < bytes_read && num_record > 0){
+            int num_record = 0;
+            while(cursor < bytes_read && num_record < slot_directory.size()){
                 //get a pointer to the data based on the offset
                 const char* raw_data = &page_data[cursor];
 
@@ -175,10 +200,11 @@ public:
                 //memcpy(&employee_id, raw_data, 8);
                 raw_data += 8;
                 cursor += 8;
+                
                 cout << "read ID:" << employee_id << endl;
                 
                 char delimiter = *raw_data;
-                cout << "delimiter:"<< delimiter <<endl;
+                //cout << "delimiter:"<< delimiter <<endl;
                 if (delimiter != '$') {
                     
                     //throw runtime_error("Format error: expected '$' after employee_id");
@@ -195,7 +221,7 @@ public:
                 string name(name_start, raw_data - name_start);
                 //cout << "read name: " << name << endl;
                 delimiter = *raw_data;
-                cout << "delimter after name:"<< delimiter <<endl;
+                //cout << "delimter after name:"<< delimiter <<endl;
 
                 raw_data++;  // Skip '$'
                 cursor++;
@@ -210,7 +236,7 @@ public:
                 string bio(bio_start, raw_data - bio_start);
                 //cout << "read bio: " << endl<< bio <<endl;;
                 delimiter = *raw_data;
-                cout << "character after bio:"<< delimiter <<endl;
+                //cout << "character after bio:"<< delimiter <<endl;
 
                 raw_data++;  // Skip '$'
                 cursor++;
@@ -221,8 +247,6 @@ public:
                 cursor += 8;
                 raw_data += 8;
 
-                //cout << "read manager ID: " << manager_id << endl;
-                //cout << "***************************" << endl;
 
                 //create a string vector with all the items
                 vector<string> fields;
@@ -234,20 +258,19 @@ public:
                 //create a record instant and populate the record vector
                 Record my_record(fields);
                 records.push_back(my_record);
-                num_record--;
+                num_record++;
+
                 if(*raw_data == '#'){
-                    cout << "have we found #???:"<<*raw_data << endl;
+                    cout << "have we found:"<<*raw_data << endl;
                     break;
                 }
-                cout << "SHOULD print RECORDs " << records.size()<< endl;
+            }
+            cout << "SHOULD print RECORDs " << records.size()<< endl;
                 c =1;
                 for(auto const& record: records){
                     cout << c <<"--record ID"<<record.id << endl;
                     c++;
                 }
-                
-            }
-            cout << "MADE IT OUT OF THE INFO POPULATOR" << endl;
 
             return true;
         }
@@ -258,6 +281,11 @@ public:
 
         return false;
     }
+
+
+
+
+    
 };
 
 class StorageManager {
@@ -327,14 +355,12 @@ public:
 
     // Searches for an Employee ID in EmployeeRelation.dat
     void findAndPrintEmployee(int searchId) {
-        
         data_file.seekg(0, ios::beg);  // Rewind the data_file to the beginning for reading
         char page_data[4096] = {0};
 
         // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory. 4KB        
-        
         int page_number = 0;
-        while(buffer[page_number].read_from_data_file(data_file) && page_number < 4){
+        while(buffer[page_number].read_from_data_file(data_file)){ //deleted
             cout << "------------------------" << endl;
             cout << "---FINISHED READING PAGE #" << page_number + 1<< page_number+ 1<< page_number+ 1 << endl;
             cout << "------------------------" << endl;
@@ -342,23 +368,27 @@ public:
             int num_record = 0;
             cout << "==== number of record: " <<buffer[page_number].records.size() << endl;
             cout << "==== number of slots: " <<buffer[page_number].slot_directory.size() << endl;
-            for(auto const &slot : buffer[page_number].slot_directory){
-                //cout << "Checking" << "("<<slot.first<<","<<slot.second<<")"<< endl;
-                //check the first 8 bytes of the record
-                //data file si the binary and we already read the whole thing, so now we're using the off set to read the first 8 bytes
-                //and if the id matches ours then we can print the record there
-                int64_t possible_id = page_data[slot.first];
-                if(possible_id == searchId){
-                   cout << "record found for ID:" <<  searchId << endl;
-                buffer[page_number].records[num_record].print(); //print here all the info for the ID
-                }
-                num_record++;
-                //cout << "#### record NUMBER: " << num_record << endl;
-                  
-            }    
-            page_number++; //next page
+            int cursor = 0;
             
+            for(auto &record : buffer[page_number].records){
+                int employee_id = record.id;
+
+                if(employee_id == searchId){
+                    record.print();
+                }
+                
+                
+                num_record++;
+            }    
+            
+            page_number++; //next page
+            if(page_number > 2){
+                break;
+            }
         }
+            cout << "MADE IT HERE" << endl;
+            cout << "MADE IT HERE" << endl;
+            cout << "MADE IT HERE" << endl;
 
         
         // TO_DO: Print "Record not found" if no records match.
