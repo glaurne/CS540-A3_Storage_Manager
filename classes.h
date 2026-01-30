@@ -53,6 +53,12 @@ public:
                                         
     int cur_size = 0; // holds the current size of the page
 
+    void clear() {
+        records.clear();
+        slot_directory.clear();
+        cur_size = 0;
+    }
+
     // Function to insert a record into the page
     bool insert_record_into_page(Record r) {
         int record_size = r.get_size();
@@ -130,7 +136,7 @@ public:
         slot_directory.clear();
 
         streamsize bytes_read = in.gcount(); // used to check if 4KB was actually read from the data file
-        // cout << "found " <<bytes_read << "bytes" << endl;
+        //cout << "found " <<bytes_read << "bytes" << endl;
         if (bytes_read == 4096) {
             
             // TO_DO: You may process page_data (4 KB page) and put the information to the records and slot_directory (main memory).
@@ -145,8 +151,8 @@ public:
                 }
             }
 
-            // cout << "# found at " << delimeter_position << endl;
-            // cout << "char:" << page_data[delimeter_position] << endl;
+            //cout << "# found at " << delimeter_position << endl;
+            //cout << "char:" << page_data[delimeter_position] << endl;
 
             //starting position of <offset, lenght of record>
             delimeter_position += 1;
@@ -170,8 +176,8 @@ public:
 
                 //populate the slot_directory and the records
                 slot_directory.push_back(make_pair(first, second));
-                // cout << "reading" << "("<<first<<","<<second<<")"<< endl;
-                // cout << "value of delimiter position:"<< delimeter_position<<endl;
+                //cout << "reading" << "("<<first<<","<<second<<")"<< endl;
+                //cout << "value of delimiter position:"<< delimeter_position<<endl;
                 if(second == 0){
                     break;
                 }
@@ -181,12 +187,7 @@ public:
                 
             }
 
-            // cout << "SHOULD print pairs " << slot_directory.size()<< endl;
-            int c =1;
-            for(auto const& slot: slot_directory){
-                // cout << c <<"--slot pair" << "("<<slot.first<<","<<slot.second<<")"<< endl;
-                c++;
-            }
+            
                 
             // TO_DO: You may modify this function to process the search for employee ID in the page you just loaded to main memory.
             int cursor = 0;
@@ -201,7 +202,7 @@ public:
                 raw_data += 8;
                 cursor += 8;
                 
-                // cout << "read ID:" << employee_id << endl;
+                //cout << "read ID:" << employee_id << endl;
                 
                 char delimiter = *raw_data;
                 //cout << "delimiter:"<< delimiter <<endl;
@@ -261,16 +262,11 @@ public:
                 num_record++;
 
                 if(*raw_data == '#'){
-                    // cout << "have we found:"<<*raw_data << endl;
+                    //cout << "have we found:"<<*raw_data << endl;
                     break;
                 }
             }
-            // cout << "SHOULD print RECORDs " << records.size()<< endl;
-                c =1;
-                for(auto const& record: records){
-                    // cout << c <<"--record ID"<<record.id << endl;
-                    c++;
-                }
+            
 
             return true;
         }
@@ -321,6 +317,7 @@ public:
         int id, manager_id;
         int page_number = 0; // Current page we are working on [at most 3 pages]
         
+
         while (getline(csvFile, line)) {   // Read each line from the CSV file, parse it, and create Employee objects
             stringstream ss(line);
             string item;
@@ -341,6 +338,7 @@ public:
                     for (page& p : buffer) { // using write_into_data_file() to write the pages into the data file
                         
                         p.write_into_data_file(data_file);
+                        p.clear();
                     }
                     page_number = 0; // Starting again from page 0
 
@@ -349,46 +347,56 @@ public:
             }
             
         }
+        for (page &p : buffer) {
+            if (!p.records.empty()) {
+                p.write_into_data_file(data_file);
+                p.clear();
+            }
+        }
         csvFile.close();  // Close the CSV file
     }
 
     // Searches for an Employee ID in EmployeeRelation.dat
     void findAndPrintEmployee(int searchId) {
+        data_file.clear(); 
         data_file.seekg(0, ios::beg);  // Rewind the data_file to the beginning for reading
         char page_data[4096] = {0};
 
         // TO_DO: Read pages from your data file (using read_from_data_file) and search for the employee ID in those pages. Be mindful of the page limit in main memory. 4KB        
         int page_number = 0;
         while(buffer[page_number].read_from_data_file(data_file)){ //deleted
-            cout << "------------------------" << endl;
-            cout << "---FINISHED READING PAGE #" << page_number + 1<< page_number+ 1<< page_number+ 1 << endl;
-            cout << "------------------------" << endl;
+            //cout << "------------------------" << endl;
+            //cout << "---FINISHED READING PAGE #" << page_number + 1<< page_number+ 1<< page_number+ 1 << endl;
+            //cout << "------------------------" << endl;
             //get the first pair <offset, lenght>
             int num_record = 0;
-            cout << "==== number of record: " <<buffer[page_number].records.size() << endl;
-            cout << "==== number of slots: " <<buffer[page_number].slot_directory.size() << endl;
+            //cout << "==== number of record: " <<buffer[page_number].records.size() << endl;
+            //cout << "==== number of slots: " <<buffer[page_number].slot_directory.size() << endl;
             int cursor = 0;
             
             for(auto &record : buffer[page_number].records){
                 int employee_id = record.id;
 
                 if(employee_id == searchId){
-                    cout << "--------FOUND RECORD-------" << endl;
+                    cout << "!*!----- HOORAY!!! your record was hiding in page... " << page_number <<" -----!*!" << endl;
                     record.print();
+                    cout << "!*!-------------------------------!*!\n\n" << endl;
+                    return;
                 }
+                
+                
                 num_record++;
             }    
             
-            page_number++; //next page
-            if(page_number > 2){
-                break;
-            }
+            page_number = (page_number + 1) % buffer.size();
+            //if(page_number > 2){
+            //    break;
+            //}
         }
-            cout << "MADE IT HERE" << endl;
 
         
         // TO_DO: Print "Record not found" if no records match.
-        cout << "Record not found for the ID:" <<  searchId << endl;
+        cout << "~~Uh oh! Record not found for the ID:" <<  searchId << endl;
         return;
 
         

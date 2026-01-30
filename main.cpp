@@ -39,10 +39,10 @@ int main(int argc, char* const argv[]) {
         ss.str(argv[i]);
         ss >> id_to_process;
 
-        cout << "PROCESSING ID:"<<id_to_process << endl;;
+        cout << "...PROCESSING ID:"<< id_to_process << endl;;
         
         manager.findAndPrintEmployee(id_to_process);
-        cout << "MADE IT OUTOUTOUTOUT here" << endl;
+        //cout << "MADE IT OUTOUTOUTOUT here" << endl;
 
     }
     
